@@ -20,11 +20,11 @@ const viewport = { width: window.innerWidth, height: window.innerHeight };
 afterAll(() => page.viewport(viewport.width, viewport.height));
 afterEach(() => { harness?.cleanup(); layout?.dispose(); });
 
-async function mount() {
+async function mount(minWidth?: number) {
   await page.viewport(1100, 800);
   harness = createReactHarness();
   harness.container.style.cssText = 'position:fixed;left:0;top:0;width:1000px;height:600px';
-  const provider = createTabProvider({ kind: 'page', resourceKey: (state: { id: string }) => state.id, initialize: () => ({ dispose() {} }), dispose() {}, TabContent: () => null, TabBarItem: () => null, TabBarItemDragPreview: () => null });
+  const provider = createTabProvider({ kind: 'page', minWidth, resourceKey: (state: { id: string }) => state.id, initialize: () => ({ dispose() {} }), dispose() {}, TabContent: () => null, TabBarItem: () => null, TabBarItemDragPreview: () => null });
   layout = new PaneLayoutStore(createTabRegistry([provider]), { viewId: 'tree-v3' });
   layout.open('page', { id: 'conversation' }, { from: null, intent: 'newTab' });
   const other = layout.open('page', { id: 'folder' }, { from: null, intent: 'newTab' })!;
@@ -77,6 +77,17 @@ it('narrowing and widening only change visibility, preserving both panes, tabs a
   expect(JSON.stringify(layout.snapshot)).toBe(before);
 });
 
+it('pages that ask for a wider pane are put away sooner, and come back at that width', async () => {
+  await mount(360);
+  const before = JSON.stringify(layout.snapshot);
+  const narrow = () => !!harness.container.querySelector('[data-pane-tree-narrow]');
+  harness.container.style.width = '720px';
+  await until('two 360px pages and their divider do not fit in 720px', narrow);
+  harness.container.style.width = '721px';
+  await until('they fit in 721px', () => !narrow());
+  expect(JSON.stringify(layout.snapshot)).toBe(before);
+});
+
 it('a page shown again after being hidden in a narrow window fills its cell, and both do once widened', async () => {
   await mount();
   const box = (paneId: string) => harness.container.querySelector(`iframe[title="${paneId}"]`)!.parentElement!.getBoundingClientRect();
@@ -100,7 +111,7 @@ it('splitting and closing a pane keep the pane that stays mounted, its page the 
   await page.viewport(1100, 800);
   harness = createReactHarness();
   harness.container.style.cssText = 'position:fixed;left:0;top:0;width:1000px;height:600px';
-  const provider = createTabProvider({ kind: 'page', resourceKey: (state: { id: string }) => state.id, initialize: () => ({ dispose() {} }), dispose() {}, TabContent: () => null, TabBarItem: () => null, TabBarItemDragPreview: () => null });
+  const provider = createTabProvider({ kind: 'page', minWidth, resourceKey: (state: { id: string }) => state.id, initialize: () => ({ dispose() {} }), dispose() {}, TabContent: () => null, TabBarItem: () => null, TabBarItemDragPreview: () => null });
   layout = new PaneLayoutStore(createTabRegistry([provider]), { viewId: 'tree-v3-keep' });
   layout.open('page', { id: 'conversation' }, { from: null, intent: 'newTab' });
   const file = layout.open('page', { id: 'file' }, { from: null, intent: 'newTab' })!;
@@ -127,7 +138,7 @@ it('a page of the pair in full screen keeps the one strip over it, and nothing u
   await page.viewport(1100, 800);
   harness = createReactHarness();
   harness.container.style.cssText = `position:fixed;left:0;top:0;width:1000px;height:600px;anchor-name:${WORKSPACE_ANCHOR}`;
-  const provider = createTabProvider({ kind: 'page', resourceKey: (state: { id: string }) => state.id, initialize: () => ({ dispose() {} }), dispose() {}, TabContent: () => null, TabBarItem: () => null, TabBarItemDragPreview: () => null });
+  const provider = createTabProvider({ kind: 'page', minWidth, resourceKey: (state: { id: string }) => state.id, initialize: () => ({ dispose() {} }), dispose() {}, TabContent: () => null, TabBarItem: () => null, TabBarItemDragPreview: () => null });
   layout = new PaneLayoutStore(createTabRegistry([provider]), { viewId: 'tree-v3-full' });
   layout.open('page', { id: 'conversation' }, { from: null, intent: 'newTab' });
   const side = layout.open('page', { id: 'notes.md' }, { from: null, intent: 'newTab' })!;
